@@ -1,5 +1,5 @@
 /* 包袋款式库 Service Worker（与本 index.html 配套，可选文件） */
-var CACHE = 'bghub-v1';
+var CACHE = 'bghub-v2';
 var CORE = ['./'];
 self.addEventListener('install', function (e) {
   self.skipWaiting();

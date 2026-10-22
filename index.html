@@ -707,11 +707,12 @@ function idbDel(db, key){
   });
 }
 
-/* 旧版（纯 localStorage 存图）自动迁移到 IndexedDB */
+/* 旧版（纯 localStorage 存图）自动迁移到 IndexedDB —— 仅执行一次 */
 function migrate(){
   try{
+    if(localStorage.getItem('bagStyles_migrated_v2') === '1') return; // 已迁移过，直接跳过
     var raw = localStorage.getItem(KEY_OLD);
-    if(!raw) return;
+    if(!raw) { localStorage.setItem('bagStyles_migrated_v2','1'); return; }
     var old = JSON.parse(raw) || [];
     var used = [];
     var list = old.map(function(o){
@@ -725,7 +726,8 @@ function migrate(){
         tag: TAGS.indexOf(o.tag) >= 0 ? o.tag : '',
         cat1: CATS[o.cat1] ? o.cat1 : '',
         cat2: '',
-        img: '',
+        // 旧格式图片是内嵌 dataURL → 迁移到 IndexedDB；新格式已是 id → 原样保留
+        img: (o.img && /^data:/.test(o.img)) ? '' : (o.img || ''),
         createdAt: o.createdAt || Date.now(),
         updatedAt: o.updatedAt || Date.now()
       };
@@ -733,6 +735,7 @@ function migrate(){
       return rec;
     });
     localStorage.setItem(KEY_OLD, JSON.stringify(list));
+    localStorage.setItem('bagStyles_migrated_v2','1');
     if(used.length && DB){
       var p = Promise.resolve();
       used.forEach(function(u){ p = p.then(function(){ return idbPut(DB, u.id, u.data); }); });

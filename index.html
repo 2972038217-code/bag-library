@@ -582,6 +582,7 @@ var LS_STYLE  = 'bg_style_v1';
 var LS_PROFILE= 'bg_profile_v1';
 var LS_ICON_M = 'bg_icon_m_v1';   // manifest 图标（含内置默认）
 var LS_ICON_S = 'bg_icon_s_v1';   // 用户自定义小图标（dataURL，可为空）
+var LS_DRAFT  = 'bg_draft_v1';    // 新增表单草稿（自动保存）
 
 var CATS = {
   '钱包': ['三折','两折','单拉','双拉','软钱包'],
@@ -1143,7 +1144,7 @@ function renderFormOptions(){
       state.formCat1 = b.dataset.c1;
       if(state.formCat1 === '') state.formCat2 = '';
       else if(state.formCat2 && CATS[state.formCat1].indexOf(state.formCat2) < 0) state.formCat2 = '';
-      renderFormOptions();
+      renderFormOptions(); draftChanged();
     };
   });
   var subs = cat1 ? CATS[cat1] : [];
@@ -1157,14 +1158,14 @@ function renderFormOptions(){
       return '<button type="button" class="opt'+(s===state.formCat2?' on':'')+'" data-c2="'+s+'"><span class="d"></span>'+s+'</button>';
     }).join('') + '<button type="button" class="opt'+(state.formCat2===''?' on':'')+'" data-c2="">不指定</button>';
     c2wrap.querySelectorAll('.opt').forEach(function(b){
-      b.onclick = function(){ state.formCat2 = b.dataset.c2; renderFormOptions(); };
+      b.onclick = function(){ state.formCat2 = b.dataset.c2; renderFormOptions(); draftChanged(); };
     });
   }
   $('f_tag').innerHTML = TAGS.map(function(t){
     return '<button type="button" class="opt'+(t===state.formTag?' on':'')+'" data-t="'+t+'"><span class="d"></span>'+t+'</button>';
   }).join('') + '<button type="button" class="opt'+(state.formTag===''?' on':'')+'" data-t="">不限</button>';
   $('f_tag').querySelectorAll('.opt').forEach(function(b){
-    b.onclick = function(){ state.formTag = b.dataset.t; renderFormOptions(); };
+    b.onclick = function(){ state.formTag = b.dataset.t; renderFormOptions(); draftChanged(); };
   });
 }
 
@@ -1173,6 +1174,36 @@ function setFormImg(url){
   var img = $('upImg'), del = $('upDel'), txt = $('upText');
   if(url){ img.src = url; img.style.display = 'block'; del.style.display = 'flex'; txt.style.display = 'none'; }
   else{ img.removeAttribute('src'); img.style.display = 'none'; del.style.display = 'none'; txt.style.display = 'block'; }
+  draftChanged();
+}
+
+/* ================= 表单草稿自动保存 ================= */
+var draftTimer = null;
+function saveDraft(){
+  if(state.editing) return; // 编辑模式走正式保存，不存草稿
+  var d = {
+    name: $('f_name').value,
+    fabric: $('f_fabric').value,
+    price: $('f_price').value,
+    factory: $('f_factory').value,
+    note: $('f_note').value,
+    cat1: state.formCat1 || '',
+    cat2: state.formCat2 || '',
+    tag: state.formTag || '',
+    img: state.formImg || '',
+    ts: Date.now()
+  };
+  // 全空则不算草稿
+  if(!d.name && !d.fabric && !d.price && !d.factory && !d.note && !d.img && !d.cat1 && !d.tag) return;
+  try{ localStorage.setItem(LS_DRAFT, JSON.stringify(d)); }catch(e){ /* 图片过大时忽略 */ }
+}
+function draftChanged(){ clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 300); }
+function clearDraft(){ try{ localStorage.removeItem(LS_DRAFT); }catch(e){} }
+function readDraft(){
+  try{
+    var d = JSON.parse(localStorage.getItem(LS_DRAFT) || 'null');
+    return d && typeof d === 'object' ? d : null;
+  }catch(e){ return null; }
 }
 
 function openForm(rec){
@@ -1191,7 +1222,26 @@ function openForm(rec){
   if(rec && rec.img && !imgCache[rec.img]){
     getImg(rec).then(function(u){ if(state.editing === rec) setFormImg(u); });
   }
+  // 非编辑模式：自动恢复未保存的草稿
+  var restored = false;
+  if(!rec){
+    var d = readDraft();
+    if(d){
+      $('f_name').value = d.name || '';
+      $('f_fabric').value = d.fabric || '';
+      $('f_price').value = d.price || '';
+      $('f_factory').value = d.factory || '';
+      $('f_note').value = d.note || '';
+      state.formCat1 = d.cat1 || '';
+      state.formCat2 = d.cat2 || '';
+      state.formTag = d.tag || '';
+      renderFormOptions();
+      if(d.img) setFormImg(d.img);
+      restored = true;
+    }
+  }
   sheetOpen($('formSheet'), $('formMask'));
+  if(restored) toast('已自动恢复上次填写的内容');
   setTimeout(function(){ if(!rec) $('f_name').focus(); }, 260);
 }
 
@@ -1253,6 +1303,7 @@ function saveForm(){
     toast('存储空间不足，请删除部分图片后重试');
     return;
   }
+  clearDraft();
   sheetClose($('formSheet'), $('formMask'));
   haptic();
   toast(state.editing ? '已保存修改' : '已添加款式');
@@ -2038,11 +2089,13 @@ function bind(){
   $('formCancel').onclick = function(){
     sheetClose($('formSheet'), $('formMask'));
     state.editing = null;
+    clearDraft();
   };
   $('formSave').onclick = saveForm;
   $('formMask').onclick = function(){
     sheetClose($('formSheet'), $('formMask'));
     state.editing = null;
+    clearDraft();
   };
 
   // 图片选择
@@ -2050,6 +2103,9 @@ function bind(){
     if(e.target.closest('#upDel')) return;
     $('f_img').click();
   };
+  ['f_name','f_fabric','f_price','f_factory','f_note'].forEach(function(id){
+    $(id).addEventListener('input', draftChanged);
+  });
   $('f_img').onchange = function(e){
     var f = e.target.files && e.target.files[0];
     e.target.value = '';

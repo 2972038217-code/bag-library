@@ -107,6 +107,7 @@ img{display:block;max-width:100%}
 .c-meta{font-size:12.5px;color:var(--text2);display:flex;align-items:center;gap:5px;
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .c-meta .sep{color:#CBD1D9}
+.c-size{font-size:11.5px;color:var(--text3);margin-top:3px;letter-spacing:.2px}
 .c-bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:7px}
 .c-tags{display:flex;gap:5px;flex-wrap:wrap;min-width:0}
 .tag{font-size:11px;line-height:1;padding:4px 7px;border-radius:5px;white-space:nowrap;
@@ -166,6 +167,9 @@ select.inp{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='h
   background-repeat:no-repeat;background-position:right 10px center;background-size:16px;padding-right:34px}
 .row2{display:flex;gap:10px}
 .row2 > *{flex:1;min-width:0}
+.row3{display:flex;gap:8px}
+.row3 > *{flex:1;min-width:0}
+.row3 .inp{padding:0 10px;font-size:15px}
 
 /* 选项按钮组 */
 .opts{display:flex;flex-wrap:wrap;gap:8px}
@@ -452,6 +456,21 @@ select.inp{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='h
         </div>
       </div>
       <div class="field">
+        <label>尺寸<span class="hint">长 × 宽 × 高，可只填部分</span></label>
+        <div class="row3">
+          <div>
+            <input class="inp" id="f_len" type="number" inputmode="decimal" step="0.1" min="0" placeholder="长（cm）">
+          </div>
+          <div>
+            <input class="inp" id="f_wid" type="number" inputmode="decimal" step="0.1" min="0" placeholder="宽（cm）">
+          </div>
+          <div>
+            <input class="inp" id="f_hei" type="number" inputmode="decimal" step="0.1" min="0" placeholder="高（cm）">
+          </div>
+        </div>
+        <div class="opts" id="f_sizePreset" style="margin-top:8px"></div>
+      </div>
+      <div class="field">
         <label>备注</label>
         <textarea class="inp" id="f_note" placeholder="工艺、五金、起订量、交期等" maxlength="300"></textarea>
       </div>
@@ -623,6 +642,19 @@ function fmtDate(ts){
   var d = new Date(ts || Date.now());
   var p = function(x){ return (x<10?'0':'') + x; };
   return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+/* 尺寸：统一存为字符串，格式「长×宽×高（cm）」，缺项用 — 占位 */
+function sizeText(r){
+  var a = r && r.sizeL, b = r && r.sizeW, c = r && r.sizeH;
+  if(!a && !b && !c) return '';
+  return (a || '—') + ' × ' + (b || '—') + ' × ' + (c || '—');
+}
+function numOrBlank(v){
+  var s = String(v == null ? '' : v).trim();
+  if(s === '') return '';
+  var n = Number(s);
+  if(!isFinite(n) || n <= 0) return '';
+  return Math.round(n * 10) / 10;
 }
 function todayFile(){
   var d = new Date();
@@ -1079,6 +1111,7 @@ function renderList(){
     if(r.fabric) meta.push(esc(r.fabric));
     if(r.factory) meta.push(esc(r.factory));
     if(!meta.length) meta.push('<span style="color:#A9B2BE">未填写面料 / 厂家</span>');
+    var sz = sizeText(r);
 
     var tags = '';
     if(r.cat1) tags += '<span class="tag lv1">' + esc(r.cat1) + (r.cat2 ? ' · ' + esc(r.cat2) : '') + '</span>';
@@ -1092,6 +1125,7 @@ function renderList(){
         '<div class="c-top">' +
           '<div class="c-name">' + esc(r.name || '未命名款式') + '</div>' +
           '<div class="c-meta">' + meta.join('<span class="sep">·</span>') + '</div>' +
+          (sz ? '<div class="c-size">' + esc(sz) + ' cm</div>' : '') +
         '</div>' +
         '<div class="c-bottom"><div class="c-tags">' + tags + '</div>' + priceHtml + '</div>' +
       '</div>' +
@@ -1169,6 +1203,35 @@ function renderFormOptions(){
   });
 }
 
+/* 常用尺寸快捷填入 */
+var SIZE_PRESETS = [
+  { l:'小', v:[20,15,8] },
+  { l:'中', v:[28,22,12] },
+  { l:'大', v:[35,28,15] },
+  { l:'钱包', v:[11,9,2] }
+];
+function renderSizePresets(){
+  var box = $('f_sizePreset');
+  if(!box) return;
+  box.innerHTML = SIZE_PRESETS.map(function(p){
+    var on = String(Number($('f_len').value)||'') === String(p.v[0]) &&
+             String(Number($('f_wid').value)||'') === String(p.v[1]) &&
+             String(Number($('f_hei').value)||'') === String(p.v[2]);
+    return '<button type="button" class="opt'+(on?' on':'')+'" data-p="'+p.v.join(',')+'" style="min-height:34px;font-size:13px">'+
+      p.l+' '+p.v.join('×')+'</button>';
+  }).join('') + '<button type="button" class="opt" data-p="clear" style="min-height:34px;font-size:13px">清空</button>';
+  box.querySelectorAll('.opt').forEach(function(b){
+    b.onclick = function(){
+      var p = b.dataset.p;
+      if(p === 'clear'){ $('f_len').value=''; $('f_wid').value=''; $('f_hei').value=''; }
+      else{ var a = p.split(','); $('f_len').value=a[0]; $('f_wid').value=a[1]; $('f_hei').value=a[2]; }
+      renderSizePresets();
+      draftChanged();
+      toast(p === 'clear' ? '尺寸已清空' : '尺寸已填入');
+    };
+  });
+}
+
 function setFormImg(url){
   state.formImg = url || '';
   var img = $('upImg'), del = $('upDel'), txt = $('upText');
@@ -1214,10 +1277,15 @@ function openForm(rec){
   $('formTitle').textContent = rec ? '编辑款式' : '新增款式';
   $('f_name').value = rec ? rec.name || '' : '';
   $('f_fabric').value = rec ? rec.fabric || '' : '';
+  $('f_len').value = rec && rec.sizeL ? rec.sizeL : '';
+  $('f_wid').value = rec && rec.sizeW ? rec.sizeW : '';
+  $('f_hei').value = rec && rec.sizeH ? rec.sizeH : '';
+  if(!rec){ $('f_len').value = ''; $('f_wid').value = ''; $('f_hei').value = ''; }
   $('f_price').value = rec && rec.price !== '' && rec.price != null ? rec.price : '';
   $('f_factory').value = rec ? rec.factory || '' : '';
   $('f_note').value = rec ? rec.note || '' : '';
   renderFormOptions();
+  renderSizePresets();
   setFormImg(rec ? (imgCache[rec.img] || '') : '');
   if(rec && rec.img && !imgCache[rec.img]){
     getImg(rec).then(function(u){ if(state.editing === rec) setFormImg(u); });
@@ -1232,10 +1300,14 @@ function openForm(rec){
       $('f_price').value = d.price || '';
       $('f_factory').value = d.factory || '';
       $('f_note').value = d.note || '';
+      $('f_len').value = '';
+      $('f_wid').value = '';
+      $('f_hei').value = '';
       state.formCat1 = d.cat1 || '';
       state.formCat2 = d.cat2 || '';
       state.formTag = d.tag || '';
       renderFormOptions();
+      renderSizePresets();
       if(d.img) setFormImg(d.img);
       restored = true;
     }
@@ -1255,6 +1327,9 @@ function saveForm(){
     if(!isFinite(p) || p < 0){ toast('单价请填写有效数字'); $('f_price').focus(); return; }
     price = Math.round(p * 100) / 100;
   }
+  var sizeL = numOrBlank($('f_len').value);
+  var sizeW = numOrBlank($('f_wid').value);
+  var sizeH = numOrBlank($('f_hei').value);
   var all = loadAll();
   var now = Date.now();
   var id;
@@ -1270,6 +1345,7 @@ function saveForm(){
       price: price,
       factory: $('f_factory').value.trim(),
       note: $('f_note').value.trim(),
+      sizeL: sizeL, sizeW: sizeW, sizeH: sizeH,
       tag: state.formTag || '',
       cat1: state.formCat1 || '',
       cat2: state.formCat2 || '',
@@ -1288,6 +1364,7 @@ function saveForm(){
       price: price,
       factory: $('f_factory').value.trim(),
       note: $('f_note').value.trim(),
+      sizeL: sizeL, sizeW: sizeW, sizeH: sizeH,
       tag: state.formTag || '',
       cat1: state.formCat1 || '',
       cat2: state.formCat2 || '',
@@ -1333,6 +1410,7 @@ function openDetail(id){
     '<div style="margin-top:6px">' +
       '<div class="dl"><dt>单价</dt><dd style="color:var(--red);font-weight:700;font-size:17px">'+esc(priceTxt)+'</dd></div>' +
       row('面料', rec.fabric) +
+      row('尺寸', sizeText(rec) ? sizeText(rec) + ' cm' : '') +
       row('厂家', rec.factory) +
       row('一级分类', rec.cat1) +
       row('二级分类', rec.cat2) +
@@ -1652,7 +1730,7 @@ function makeXlsx(sheets){
 }
 
 /* ================= 导出 ================= */
-var HEADERS = ['款式名称','一级分类','二级分类','面料','面料分类','单价','厂家名称','备注','款式图片(图片链接)','添加时间'];
+var HEADERS = ['款式名称','一级分类','二级分类','面料','面料分类','单价','尺寸长(cm)','尺寸宽(cm)','尺寸高(cm)','厂家名称','备注','款式图片(图片链接)','添加时间'];
 function exportRows(all, withPics){
   var seen = {};
   var rows = [HEADERS.slice()];
@@ -1661,6 +1739,9 @@ function exportRows(all, withPics){
     rows.push([
       r.name || '', r.cat1 || '', r.cat2 || '', r.fabric || '', r.tag || '',
       r.price === '' || r.price == null ? '' : Number(r.price),
+      r.sizeL === '' || r.sizeL == null ? '' : Number(r.sizeL),
+      r.sizeW === '' || r.sizeW == null ? '' : Number(r.sizeW),
+      r.sizeH === '' || r.sizeH == null ? '' : Number(r.sizeH),
       r.factory || '', r.note || '',
       withPics && r.img ? (window.location.href.split('?')[0].split('#')[0] + '?img=' + encodeURIComponent(r.id)) : '',
       fmtDate(r.createdAt)
@@ -1686,7 +1767,7 @@ function doExport(){
     return r;
   });
   var blob = makeXlsx([
-    { name:'款式数据', rows: sheetRows, widths:[22,10,12,18,10,10,22,32,30,13] },
+    { name:'款式数据', rows: sheetRows, widths:[22,10,12,18,10,10,12,12,12,22,32,30,13] },
     { name:'说明', rows:[
         ['包袋款式库 · 导出说明'],
         ['导出时间', new Date().toLocaleString('zh-CN')],
@@ -1701,6 +1782,7 @@ function doExport(){
         ['字段说明'],
         ['款式名称', '必填'],
         ['面料', '面料名称，如 12安加厚帆布'],
+        ['尺寸长/宽/高(cm)', '数字，可留空；导入后显示为 长×宽×高'],
         ['面料分类', '帆布 / PU / 布料 / 其他'],
         ['图片', '图片保存于手机本地，Excel 中不含图片二进制'],
       ], widths:[14,60] }
@@ -1712,11 +1794,11 @@ function doExport(){
 function doTemplate(){
   var rows = [
     HEADERS.slice(),
-    ['经典帆布托特包','大包','帆布包','12安加厚帆布','帆布',48.5,'广州华美箱包厂','米白/军绿两色，含手提加固','',fmtDate(Date.now())],
-    ['三折短款钱包','钱包','三折','头层牛皮','其他',32,'东莞丽达皮具','压花可选','',fmtDate(Date.now())],
-    ['双拉链方包','钱包','双拉','PU 荔枝纹','PU',26,'义乌简行箱包','五金电镀哑光','',fmtDate(Date.now())]
+    ['经典帆布托特包','大包','帆布包','12安加厚帆布','帆布',48.5,40,35,12,'广州华美箱包厂','米白/军绿两色，含手提加固','',fmtDate(Date.now())],
+    ['三折短款钱包','钱包','三折','头层牛皮','其他',32,11,9,2.5,'东莞丽达皮具','压花可选','',fmtDate(Date.now())],
+    ['双拉链方包','钱包','双拉','PU 荔枝纹','PU',26,20,13,7,'义乌简行箱包','五金电镀哑光','',fmtDate(Date.now())]
   ];
-  var blob = makeXlsx([{ name:'导入模板', rows: rows, widths:[22,10,12,18,10,10,22,32,30,13] }]);
+  var blob = makeXlsx([{ name:'导入模板', rows: rows, widths:[22,10,12,18,10,10,12,12,12,22,32,30,13] }]);
   downloadBlob(blob, '款式导入模板.xlsx');
   toast('模板已下载，填好后即可导入');
 }
@@ -1877,6 +1959,10 @@ var FIELD_MAP = [
   { k:'fabric',  alias:['面料','面料名称','材质','面料成分'] },
   { k:'tag',     alias:['面料分类','面料分类标签','面料标签','标签','分类标签'] },
   { k:'price',   alias:['单价','价格','报价','售价','成本','单价（元）','单价(元)','单价/元'] },
+  { k:'sizeL',   alias:['尺寸长','长','长度','长(cm)','长cm','长（cm）'] },
+  { k:'sizeW',   alias:['尺寸宽','宽','宽度','宽(cm)','宽cm','宽（cm）'] },
+  { k:'sizeH',   alias:['尺寸高','高','高度','高(cm)','高cm','高（cm）'] },
+  { k:'size',    alias:['尺寸','规格','尺寸(cm)','尺寸规格','长宽高'] },
   { k:'factory', alias:['厂家名称','厂家','工厂','供应商','生产厂家','厂名'] },
   { k:'note',    alias:['备注','说明','描述','工艺说明'] },
   { k:'img',     alias:['款式图片','图片','款式图片(图片链接)','图片链接','图片地址'] }
@@ -1953,6 +2039,14 @@ function smartParse(rawRows){
     var priceStr = get('price').replace(/[¥￥,\s元]/g,'');
     var price = priceStr === '' ? '' : Number(priceStr);
     if(price !== '' && (!isFinite(price) || price < 0)) price = '';
+    var sizeL = numOrBlank(get('sizeL'));
+    var sizeW = numOrBlank(get('sizeW'));
+    var sizeH = numOrBlank(get('sizeH'));
+    // 单列「尺寸」如 40*35*12 / 40×35×12 / 40x35x12
+    if(!sizeL && !sizeW && !sizeH){
+      var sp = String(get('size')).replace(/[（）cmCM 　]/g,'').split(/[*x×X*]/);
+      if(sp.length >= 2){ sizeL = numOrBlank(sp[0]); sizeW = numOrBlank(sp[1]); sizeH = numOrBlank(sp[2]); }
+    }
     var c1 = pickCat(get('cat1'));
     out.push({
       name: name.slice(0,60),
@@ -1961,6 +2055,7 @@ function smartParse(rawRows){
       fabric: get('fabric').slice(0,40),
       tag: pickTag(get('tag')),
       price: price === '' ? '' : Math.round(price*100)/100,
+      sizeL: sizeL, sizeW: sizeW, sizeH: sizeH,
       factory: get('factory').slice(0,40),
       note: get('note').slice(0,300)
     });
@@ -1999,6 +2094,7 @@ function doImport(file){
       res.items.forEach(function(it, i){
         all.push({
           id: uid(), name: it.name, fabric: it.fabric, price: it.price,
+          sizeL: it.sizeL, sizeW: it.sizeW, sizeH: it.sizeH,
           factory: it.factory, note: it.note, tag: it.tag,
           cat1: it.cat1, cat2: it.cat2, img: '',
           createdAt: now + i, updatedAt: now + i
@@ -2105,6 +2201,9 @@ function bind(){
   };
   ['f_name','f_fabric','f_price','f_factory','f_note'].forEach(function(id){
     $(id).addEventListener('input', draftChanged);
+  });
+  ['f_len','f_wid','f_hei'].forEach(function(id){
+    $(id).addEventListener('input', function(){ draftChanged(); });
   });
   $('f_img').onchange = function(e){
     var f = e.target.files && e.target.files[0];

@@ -649,6 +649,15 @@ function sizeText(r){
   if(!a && !b && !c) return '';
   return (a || '—') + ' × ' + (b || '—') + ' × ' + (c || '—');
 }
+/* 体积：长×宽×高，返回 { txt, L } ；任一项缺失则无效 */
+function volumeOf(r){
+  if(!r) return null;
+  var a = Number(r.sizeL), b = Number(r.sizeW), c = Number(r.sizeH);
+  if(!a || !b || !c) return null;
+  var cm3 = a * b * c;
+  var L = Math.round(cm3 / 10) / 100; // 保留两位小数（升）
+  return { cm3: Math.round(cm3 * 10) / 10, L: L, txt: (L >= 1 ? L + ' L' : Math.round(cm3) + ' cm³') };
+}
 function numOrBlank(v){
   var s = String(v == null ? '' : v).trim();
   if(s === '') return '';
@@ -1112,6 +1121,7 @@ function renderList(){
     if(r.factory) meta.push(esc(r.factory));
     if(!meta.length) meta.push('<span style="color:#A9B2BE">未填写面料 / 厂家</span>');
     var sz = sizeText(r);
+    var vol = volumeOf(r);
 
     var tags = '';
     if(r.cat1) tags += '<span class="tag lv1">' + esc(r.cat1) + (r.cat2 ? ' · ' + esc(r.cat2) : '') + '</span>';
@@ -1125,7 +1135,7 @@ function renderList(){
         '<div class="c-top">' +
           '<div class="c-name">' + esc(r.name || '未命名款式') + '</div>' +
           '<div class="c-meta">' + meta.join('<span class="sep">·</span>') + '</div>' +
-          (sz ? '<div class="c-size">' + esc(sz) + ' cm</div>' : '') +
+          (sz ? '<div class="c-size">' + esc(sz) + ' cm' + (vol ? ' · 约 ' + esc(vol.txt) : '') + '</div>' : '') +
         '</div>' +
         '<div class="c-bottom"><div class="c-tags">' + tags + '</div>' + priceHtml + '</div>' +
       '</div>' +
@@ -1411,6 +1421,7 @@ function openDetail(id){
       '<div class="dl"><dt>单价</dt><dd style="color:var(--red);font-weight:700;font-size:17px">'+esc(priceTxt)+'</dd></div>' +
       row('面料', rec.fabric) +
       row('尺寸', sizeText(rec) ? sizeText(rec) + ' cm' : '') +
+      (function(){ var v = volumeOf(rec); return v ? row('体积', '约 ' + v.txt + '（' + v.cm3 + ' cm³）') : ''; })() +
       row('厂家', rec.factory) +
       row('一级分类', rec.cat1) +
       row('二级分类', rec.cat2) +
@@ -1730,7 +1741,7 @@ function makeXlsx(sheets){
 }
 
 /* ================= 导出 ================= */
-var HEADERS = ['款式名称','一级分类','二级分类','面料','面料分类','单价','尺寸长(cm)','尺寸宽(cm)','尺寸高(cm)','厂家名称','备注','款式图片(图片链接)','添加时间'];
+var HEADERS = ['款式名称','一级分类','二级分类','面料','面料分类','单价','尺寸长(cm)','尺寸宽(cm)','尺寸高(cm)','体积(L)','厂家名称','备注','款式图片(图片链接)','添加时间'];
 function exportRows(all, withPics){
   var seen = {};
   var rows = [HEADERS.slice()];
@@ -1742,6 +1753,7 @@ function exportRows(all, withPics){
       r.sizeL === '' || r.sizeL == null ? '' : Number(r.sizeL),
       r.sizeW === '' || r.sizeW == null ? '' : Number(r.sizeW),
       r.sizeH === '' || r.sizeH == null ? '' : Number(r.sizeH),
+      (function(){ var v = volumeOf(r); return v ? v.L : ''; })(),
       r.factory || '', r.note || '',
       withPics && r.img ? (window.location.href.split('?')[0].split('#')[0] + '?img=' + encodeURIComponent(r.id)) : '',
       fmtDate(r.createdAt)
@@ -1767,7 +1779,7 @@ function doExport(){
     return r;
   });
   var blob = makeXlsx([
-    { name:'款式数据', rows: sheetRows, widths:[22,10,12,18,10,10,12,12,12,22,32,30,13] },
+    { name:'款式数据', rows: sheetRows, widths:[22,10,12,18,10,10,12,12,12,10,22,32,30,13] },
     { name:'说明', rows:[
         ['包袋款式库 · 导出说明'],
         ['导出时间', new Date().toLocaleString('zh-CN')],
@@ -1783,6 +1795,7 @@ function doExport(){
         ['款式名称', '必填'],
         ['面料', '面料名称，如 12安加厚帆布'],
         ['尺寸长/宽/高(cm)', '数字，可留空；导入后显示为 长×宽×高'],
+        ['体积(L)', '自动按 长×宽×高 计算，无需填写'],
         ['面料分类', '帆布 / PU / 布料 / 其他'],
         ['图片', '图片保存于手机本地，Excel 中不含图片二进制'],
       ], widths:[14,60] }
@@ -1794,11 +1807,11 @@ function doExport(){
 function doTemplate(){
   var rows = [
     HEADERS.slice(),
-    ['经典帆布托特包','大包','帆布包','12安加厚帆布','帆布',48.5,40,35,12,'广州华美箱包厂','米白/军绿两色，含手提加固','',fmtDate(Date.now())],
-    ['三折短款钱包','钱包','三折','头层牛皮','其他',32,11,9,2.5,'东莞丽达皮具','压花可选','',fmtDate(Date.now())],
-    ['双拉链方包','钱包','双拉','PU 荔枝纹','PU',26,20,13,7,'义乌简行箱包','五金电镀哑光','',fmtDate(Date.now())]
+    ['经典帆布托特包','大包','帆布包','12安加厚帆布','帆布',48.5,40,35,12,16.8,'广州华美箱包厂','米白/军绿两色，含手提加固','',fmtDate(Date.now())],
+    ['三折短款钱包','钱包','三折','头层牛皮','其他',32,11,9,2.5,0.25,'东莞丽达皮具','压花可选','',fmtDate(Date.now())],
+    ['双拉链方包','钱包','双拉','PU 荔枝纹','PU',26,20,13,7,1.82,'义乌简行箱包','五金电镀哑光','',fmtDate(Date.now())]
   ];
-  var blob = makeXlsx([{ name:'导入模板', rows: rows, widths:[22,10,12,18,10,10,12,12,12,22,32,30,13] }]);
+  var blob = makeXlsx([{ name:'导入模板', rows: rows, widths:[22,10,12,18,10,10,12,12,12,10,22,32,30,13] }]);
   downloadBlob(blob, '款式导入模板.xlsx');
   toast('模板已下载，填好后即可导入');
 }

@@ -371,6 +371,39 @@ select.inp{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='h
     </div>
 
     <div class="sec">
+      <div class="sec-h">数据保险（防丢失）</div>
+      <div class="sitem" style="cursor:default">
+        <span class="si-ico gray"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
+        <span class="si-txt"><b>存储保护状态</b><small id="persistState">检查中…</small></span>
+      </div>
+      <button class="sitem" id="btnPersist">
+        <span class="si-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7z"/></svg></span>
+        <span class="si-txt"><b>开启持久化存储</b><small>让系统不要自动清理本机数据</small></span>
+        <span class="si-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+      <button class="sitem" id="btnSnapshot">
+        <span class="si-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2z"/><path d="M8 6V4h8v2"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+        <span class="si-txt"><b>立即备份到本机</b><small id="snapInfo">生成一份本地完整备份（含图片）</small></span>
+        <span class="si-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+      <button class="sitem" id="btnRestore" style="display:none">
+        <span class="si-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg></span>
+        <span class="si-txt"><b style="color:var(--red)">从本机备份恢复</b><small id="restoreInfo">检测到备份，可一键还原</small></span>
+        <span class="si-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+      <button class="sitem" id="btnBackupFile">
+        <span class="si-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg></span>
+        <span class="si-txt"><b>下载完整备份文件</b><small>含图片，可在新手机一键还原</small></span>
+        <span class="si-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+      <button class="sitem" id="btnRestoreFile">
+        <span class="si-ico gray"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg></span>
+        <span class="si-txt"><b>从备份文件还原</b><small>选择 .json 备份文件恢复全部数据</small></span>
+        <span class="si-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+    </div>
+
+    <div class="sec">
       <div class="sec-h">App 外观</div>
       <div class="icon-preview">
         <div class="pv" id="iconPv"></div>
@@ -578,6 +611,7 @@ select.inp{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='h
   </section>
 
   <input type="file" id="impFile" accept=".xlsx,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="sr">
+  <input type="file" id="bkFile" accept=".json,application/json" class="sr">
 
   <button class="fab" id="fab" aria-label="新增款式">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -810,9 +844,17 @@ function loadAll(){
     return Array.isArray(arr) ? arr : [];
   }catch(e){ return []; }
 }
+var lastAutoBk = 0;
+function bgAutoBackup(){
+  var now = Date.now();
+  if(now - lastAutoBk < 30000) return;
+  lastAutoBk = now;
+  setTimeout(function(){ if(typeof saveAutoBackup === 'function') saveAutoBackup(true); }, 600);
+}
 function saveAll(arr){
   try{
     localStorage.setItem(KEY_OLD, JSON.stringify(arr));
+    bgAutoBackup();
     return true;
   }catch(e){
     throw new Error('STORAGE_FULL');
@@ -1561,6 +1603,8 @@ function renderStats(){
   var custom = false;
   try{ custom = !!localStorage.getItem(LS_ICON_S); }catch(e){}
   $('btnIconReset').style.display = custom ? 'flex' : 'none';
+  refreshSnapshotInfo();
+  refreshPersistState();
 }
 
 /* ================= 后台压缩：把 SVG 默认图标转 PNG（便于 PWA 安装校验） ================= */
@@ -2149,6 +2193,144 @@ function doImport(file){
   });
 }
 
+
+/* ================= 数据保险：持久化存储 + 自动备份 + 文件备份 ================= */
+var LS_BK = 'bg_autobackup_v1';   // 自动备份（最近一次快照，含图片）
+
+function askPersist(){
+  if(!navigator.storage || !navigator.storage.persist){
+    return Promise.resolve('unsupported');
+  }
+  return navigator.storage.persisted().then(function(yes){
+    if(yes) return 'granted';
+    return navigator.storage.persist().then(function(ok){ return ok ? 'granted' : 'denied'; });
+  }).catch(function(){ return 'denied'; });
+}
+function refreshPersistState(){
+  var el = $('persistState');
+  if(!el) return;
+  if(!navigator.storage || !navigator.storage.persisted){
+    el.textContent = '当前浏览器不支持持久化，请定期下载备份文件';
+    return;
+  }
+  navigator.storage.persisted().then(function(yes){
+    var est = navigator.storage.estimate ? navigator.storage.estimate() : Promise.resolve({});
+    est.then(function(e){
+      var used = e.usage ? (e.usage/1048576).toFixed(1) + ' MB' : '';
+      el.textContent = yes
+        ? ('已开启持久化' + (used ? '，当前占用 ' + used : '') + '；仍建议定期下载备份')
+        : ('未开启（系统可能自动清理）' + (used ? '，当前占用 ' + used : ''));
+    }).catch(function(){
+      el.textContent = yes ? '已开启持久化' : '未开启（系统可能自动清理）';
+    });
+  }).catch(function(){
+    el.textContent = '状态未知';
+  });
+}
+
+/* 收集全部数据（含图片）为可序列化对象 */
+function collectAll(){
+  var list = loadAll();
+  var db = DB;
+  return new Promise(function(resolve){
+    if(!db){ resolve({ ver:1, ts:Date.now(), list:list, imgs:{} }); return; }
+    var imgs = {}, keys = list.filter(function(r){ return !!r.img; }).map(function(r){ return r.img; });
+    var i = 0;
+    (function next(){
+      if(i >= keys.length){ resolve({ ver:1, ts:Date.now(), list:list, imgs:imgs }); return; }
+      var k = keys[i++];
+      idbGet(db, k).then(function(v){ if(v) imgs[k] = v; next(); }).catch(next);
+    })();
+  });
+}
+
+function saveAutoBackup(silent){
+  return collectAll().then(function(data){
+    try{
+      localStorage.setItem(LS_BK, JSON.stringify(data));
+      if(!silent) toast('已备份到本机（' + data.list.length + ' 条）');
+      refreshSnapshotInfo();
+      return true;
+    }catch(e){
+      if(!silent) toast('备份失败：存储空间不足');
+      return false;
+    }
+  });
+}
+function readAutoBackup(){
+  try{
+    var d = JSON.parse(localStorage.getItem(LS_BK) || 'null');
+    return d && d.list ? d : null;
+  }catch(e){ return null; }
+}
+function refreshSnapshotInfo(){
+  var bk = readAutoBackup();
+  var snap = $('snapInfo'), rst = $('restoreInfo'), rBtn = $('btnRestore');
+  if(snap){
+    snap.textContent = bk
+      ? ('上次备份：' + new Date(bk.ts).toLocaleString('zh-CN', {hour12:false}) + '（' + bk.list.length + ' 条）')
+      : '生成一份本地完整备份（含图片）';
+  }
+  if(rBtn){
+    // 仅当当前数据比备份少时，才提示可恢复
+    var cur = loadAll().length;
+    var has = bk && bk.list.length > 0;
+    rBtn.style.display = has ? 'flex' : 'none';
+    if(rst && has) rst.textContent = '备份含 ' + bk.list.length + ' 条，当前 ' + cur + ' 条';
+  }
+}
+
+/* 从备份对象恢复（清空后写入） */
+function applyBackup(data){
+  var list = (data.list || []).map(function(r){ return r; });
+  saveAll(list);
+  imgCache = {};
+  var imgs = data.imgs || {};
+  var keys = Object.keys(imgs);
+  if(DB && keys.length){
+    var p = Promise.resolve();
+    keys.forEach(function(k){ p = p.then(function(){ return idbPut(DB, k, imgs[k]); }); });
+    return p.then(function(){
+      renderChips(); renderList(); renderStats(); refreshSnapshotInfo();
+    });
+  }
+  renderChips(); renderList(); renderStats(); refreshSnapshotInfo();
+  return Promise.resolve();
+}
+
+function downloadBackupFile(){
+  var all = loadAll();
+  if(!all.length && !readAutoBackup()){ toast('还没有数据可备份'); return; }
+  toast('正在打包…');
+  collectAll().then(function(data){
+    var blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+    downloadBlob(blob, '包袋款式库_完整备份_' + todayFile() + '.json');
+    toast('备份文件已生成，请保存到「文件」App');
+  });
+}
+
+function restoreFromFile(file){
+  if(!file) return;
+  var r = new FileReader();
+  r.onload = function(){
+    var data;
+    try{ data = JSON.parse(r.result); }catch(e){ toast('文件格式不正确'); return; }
+    if(!data || !Array.isArray(data.list)){ toast('不是有效的备份文件'); return; }
+    confirmDlg({
+      title: '还原备份？',
+      body: '备份含 <b style="color:#14181F">' + data.list.length + '</b> 条款式（' +
+            new Date(data.ts || Date.now()).toLocaleDateString('zh-CN') + '）。<br>当前本机的 <b>' + loadAll().length +
+            '</b> 条将被<b>覆盖</b>，确定还原吗？',
+      ok: '还原', cancel: '取消', danger: true
+    }).then(function(ok){
+      if(!ok) return;
+      applyBackup(data).then(function(){ toast('已还原 ' + data.list.length + ' 条款式'); });
+    });
+  };
+  r.onerror = function(){ toast('文件读取失败'); };
+  r.readAsText(file, 'utf-8');
+}
+
 /* ================= 清空 ================= */
 function doClear(){
   var n = loadAll().length;
@@ -2296,6 +2478,34 @@ function bind(){
   };
 
   // 设置
+  $('btnPersist').onclick = function(){
+    askPersist().then(function(st){
+      refreshPersistState();
+      toast(st === 'granted' ? '已开启持久化存储' : '浏览器未授予，请定期备份');
+    });
+  };
+  $('btnSnapshot').onclick = function(){ saveAutoBackup(false); };
+  $('btnRestore').onclick = function(){
+    var bk = readAutoBackup();
+    if(!bk){ toast('没有可用备份'); return; }
+    confirmDlg({
+      title: '从本机备份恢复？',
+      body: '备份含 <b style="color:#14181F">' + bk.list.length + '</b> 条（' +
+            new Date(bk.ts).toLocaleString('zh-CN', {hour12:false}) +
+            '）。<br>当前数据将被覆盖。',
+      ok: '恢复', cancel: '取消', danger: true
+    }).then(function(ok){
+      if(!ok) return;
+      applyBackup(bk).then(function(){ toast('已恢复 ' + bk.list.length + ' 条'); });
+    });
+  };
+  $('btnBackupFile').onclick = downloadBackupFile;
+  $('btnRestoreFile').onclick = function(){ $('bkFile').click(); };
+  $('bkFile').onchange = function(e){
+    var f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if(f) restoreFromFile(f);
+  };
   $('btnExport').onclick = doExport;
   $('btnTemplate').onclick = doTemplate;
   $('btnImport').onclick = function(){ $('impFile').click(); };
@@ -2441,6 +2651,13 @@ function boot(){
   });
 
   registerSW();
+
+  // 启动即尝试开启持久化存储，并在有数据时自动打一次本地备份
+  askPersist().then(function(){ refreshPersistState(); });
+  setTimeout(function(){
+    if(loadAll().length) saveAutoBackup(true);
+    refreshSnapshotInfo();
+  }, 2500);
 
   window.addEventListener('online', function(){ toast('网络已恢复'); });
 

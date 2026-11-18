@@ -97,7 +97,11 @@ img{display:block;max-width:100%}
 .card{background:var(--card);border:1px solid var(--line2);border-radius:var(--r);box-shadow:var(--sh);
   display:flex;gap:12px;padding:11px;align-items:stretch;position:relative;overflow:hidden}
 .thumb{width:88px;height:88px;border-radius:10px;background:var(--card2);flex:0 0 88px;
-  overflow:hidden;display:flex;align-items:center;justify-content:center;color:#B6BEC9}
+  overflow:hidden;display:flex;align-items:center;justify-content:center;color:#B6BEC9;position:relative}
+.thumb .cimg-badge{position:absolute;left:0;bottom:0;z-index:2;background:rgba(37,86,196,.88);
+  color:#fff;font-size:10px;font-style:normal;line-height:1;padding:3px 7px 4px;
+  border-radius:0 8px 0 0;letter-spacing:1px;pointer-events:none}
+.cimg-label{font-size:12.5px;color:#8D96A3;font-weight:500;margin:12px 2px 6px}
 .thumb img{width:100%;height:100%;object-fit:cover}
 .thumb span{font-size:11px;color:#B6BEC9}
 .c-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;padding:1px 0}
@@ -546,6 +550,21 @@ select.inp{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='h
           <div class="up-tip">点击方块选择图片<br><b>建议正方形</b>，长图会居中裁切<br>压缩后约 30–80KB</div>
         </div>
         <input type="file" id="f_img" accept="image/*" class="sr">
+      </div>
+      <div class="field">
+        <label>色卡图片<span class="hint">可选，面料色卡 / 色号卡</span></label>
+        <div class="uploader">
+          <div class="up-box" id="upBox2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            <span id="upText2">上传色卡图片</span>
+            <img id="upImg2" alt="" style="display:none">
+            <button class="up-del" id="upDel2" style="display:none" aria-label="移除色卡图片">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="up-tip">点击方块选择色卡图片<br>与款式图片一样自动压缩保存</div>
+        </div>
+        <input type="file" id="f_cimg" accept="image/*" class="sr">
       </div>
     </div>
   </section>
@@ -1032,9 +1051,8 @@ function compressImage(file, maxSide, quality){
 
 /* 图片读取（IndexedDB 优先，旧数据回退 localStorage） */
 var imgCache = {};
-function getImg(rec){
-  if(!rec || !rec.img) return Promise.resolve('');
-  var key = rec.img;
+function getImgByKey(key){
+  if(!key) return Promise.resolve('');
   if(imgCache[key]) return Promise.resolve(imgCache[key]);
   if(!DB) return Promise.resolve('');
   return idbGet(DB, key).then(function(v){
@@ -1042,6 +1060,7 @@ function getImg(rec){
     return v || '';
   }).catch(function(){ return ''; });
 }
+function getImg(rec){ return getImgByKey(rec && rec.img); }
 function putImg(id, dataUrl){
   imgCache[id] = dataUrl;
   if(!DB) return Promise.resolve(false);
@@ -1061,6 +1080,7 @@ var state = {
   sort: 'new',
   editing: null,
   formImg: '',
+  formCimg: '',
   detailId: null,
   view: []
 };
@@ -1209,6 +1229,7 @@ function renderList(){
 
     return '<article class="card" data-id="'+r.id+'">' +
       '<div class="thumb" data-img="'+(r.img ? r.id : '')+'">' +
+        (r.cimg ? '<i class="cimg-badge">色卡</i>' : '') +
         (r.img ? '<span>加载中</span>' : '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8.5" cy="8.5" r="1.4"/><path d="M21 15l-5-5L5 21"/></svg>') +
       '</div>' +
       '<div class="c-body">' +
@@ -1236,7 +1257,7 @@ function renderList(){
     if(!el) return;
     getImg(r).then(function(url){
       if(!url || !el.isConnected) return;
-      el.innerHTML = '';
+      el.innerHTML = r.cimg ? '<i class="cimg-badge">色卡</i>' : '';
       var i = new Image();
       i.src = url;
       i.alt = r.name || '';
@@ -1336,6 +1357,14 @@ function setFormImg(url){
   draftChanged();
 }
 
+function setFormCimg(url){
+  state.formCimg = url || '';
+  var img = $('upImg2'), del = $('upDel2'), txt = $('upText2');
+  if(url){ img.src = url; img.style.display = 'block'; del.style.display = 'flex'; txt.style.display = 'none'; }
+  else{ img.removeAttribute('src'); img.style.display = 'none'; del.style.display = 'none'; txt.style.display = 'block'; }
+  draftChanged();
+}
+
 /* ================= 表单草稿自动保存 ================= */
 var draftTimer = null;
 function saveDraft(){
@@ -1350,10 +1379,11 @@ function saveDraft(){
     cat2: state.formCat2 || '',
     tag: state.formTag || '',
     img: state.formImg || '',
+    cimg: state.formCimg || '',
     ts: Date.now()
   };
   // 全空则不算草稿
-  if(!d.name && !d.fabric && !d.price && !d.factory && !d.note && !d.img && !d.cat1 && !d.tag) return;
+  if(!d.name && !d.fabric && !d.price && !d.factory && !d.note && !d.img && !d.cimg && !d.cat1 && !d.tag) return;
   try{ localStorage.setItem(LS_DRAFT, JSON.stringify(d)); }catch(e){ /* 图片过大时忽略 */ }
 }
 function draftChanged(){ clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 300); }
@@ -1388,6 +1418,10 @@ function openForm(rec){
   if(rec && rec.img && !imgCache[rec.img]){
     getImg(rec).then(function(u){ if(state.editing === rec) setFormImg(u); });
   }
+  setFormCimg(rec ? (imgCache[rec.cimg] || '') : '');
+  if(rec && rec.cimg && !imgCache[rec.cimg]){
+    getImgByKey(rec.cimg).then(function(u){ if(state.editing === rec) setFormCimg(u); });
+  }
   // 非编辑模式：自动恢复未保存的草稿
   var restored = false;
   if(!rec){
@@ -1409,6 +1443,7 @@ function openForm(rec){
       renderFormOptions();
       renderSizePresets();
       if(d.img) setFormImg(d.img);
+      if(d.cimg) setFormCimg(d.cimg);
       restored = true;
     }
   }
@@ -1455,11 +1490,14 @@ function saveForm(){
       cat1: state.formCat1 || '',
       cat2: state.formCat2 || '',
       img: state.formImg ? id : '',
+      cimg: state.formCimg ? (id + '_c') : '',
       createdAt: old.createdAt || now,
       updatedAt: now
     };
     if(state.formImg) putImg(id, state.formImg);
     else delImg(id);
+    if(state.formCimg) putImg(id + '_c', state.formCimg);
+    else delImg(id + '_c');
   }else{
     id = uid();
     all.push({
@@ -1474,10 +1512,12 @@ function saveForm(){
       cat1: state.formCat1 || '',
       cat2: state.formCat2 || '',
       img: state.formImg ? id : '',
+      cimg: state.formCimg ? (id + '_c') : '',
       createdAt: now,
       updatedAt: now
     });
     if(state.formImg) putImg(id, state.formImg);
+    if(state.formCimg) putImg(id + '_c', state.formCimg);
   }
   try{
     saveAll(all);
@@ -1525,6 +1565,7 @@ function openDetail(id){
       row('添加时间', fmtDate(rec.createdAt)) +
       (rec.updatedAt && rec.updatedAt !== rec.createdAt ? row('更新时间', fmtDate(rec.updatedAt)) : '') +
       (rec.note ? '<div class="dl" style="flex-direction:column;gap:5px"><dt style="flex:none">备注</dt><dd class="pre">'+esc(rec.note)+'</dd></div>' : '') +
+      (rec.cimg ? '<div class="cimg-label">色卡图片</div><div class="detail-img" id="detailCimg"><span style="font-size:12px;color:#B6BEC9">加载图片…</span></div>' : '') +
     '</div>';
   sheetOpen($('detailSheet'), $('detailMask'));
   if(rec.img){
@@ -1533,6 +1574,15 @@ function openDetail(id){
       if(!box || !u) return;
       box.innerHTML = '';
       var i = new Image(); i.src = u; i.alt = rec.name || '';
+      box.appendChild(i);
+    });
+  }
+  if(rec.cimg){
+    getImgByKey(rec.cimg).then(function(u){
+      var box = $('detailCimg');
+      if(!box || !u) return;
+      box.innerHTML = '';
+      var i = new Image(); i.src = u; i.alt = '色卡图片';
       box.appendChild(i);
     });
   }
@@ -1839,7 +1889,7 @@ function makeXlsx(sheets){
 }
 
 /* ================= 导出 ================= */
-var HEADERS = ['款式名称','一级分类','二级分类','面料','面料分类','单价','尺寸长(cm)','尺寸宽(cm)','尺寸高(cm)','装箱数(个)','体积(m³)','厂家名称','备注','款式图片(图片链接)','添加时间'];
+var HEADERS = ['款式名称','一级分类','二级分类','面料','面料分类','单价','尺寸长(cm)','尺寸宽(cm)','尺寸高(cm)','装箱数(个)','体积(m³)','厂家名称','备注','款式图片(图片链接)','色卡图片(图片链接)','添加时间'];
 function exportRows(all, withPics){
   var seen = {};
   var rows = [HEADERS.slice()];
@@ -1855,6 +1905,7 @@ function exportRows(all, withPics){
       r.volume === '' || r.volume == null ? '' : Number(r.volume),
       r.factory || '', r.note || '',
       withPics && r.img ? (window.location.href.split('?')[0].split('#')[0] + '?img=' + encodeURIComponent(r.id)) : '',
+      withPics && r.cimg ? (window.location.href.split('?')[0].split('#')[0] + '?img=' + encodeURIComponent(r.id + '_c')) : '',
       fmtDate(r.createdAt)
     ]);
   });
@@ -1878,7 +1929,7 @@ function doExport(){
     return r;
   });
   var blob = makeXlsx([
-    { name:'款式数据', rows: sheetRows, widths:[22,10,12,18,10,10,12,12,12,11,10,22,32,30,13] },
+    { name:'款式数据', rows: sheetRows, widths:[22,10,12,18,10,10,12,12,12,11,10,22,32,30,12,13] },
     { name:'说明', rows:[
         ['包袋款式库 · 导出说明'],
         ['导出时间', new Date().toLocaleString('zh-CN')],
@@ -1898,6 +1949,7 @@ function doExport(){
         ['体积(m³)', '手动填写的数值，单位立方米，如 0.0175'],
         ['面料分类', '帆布 / PU / 布料 / 其他'],
         ['图片', '图片保存于手机本地，Excel 中不含图片二进制'],
+        ['色卡图片', '色卡图片保存于手机本地，Excel 中不含图片二进制'],
       ], widths:[14,60] }
   ]);
   downloadBlob(blob, '包袋款式库_' + todayFile() + '.xlsx');
@@ -1911,7 +1963,7 @@ function doTemplate(){
     ['三折短款钱包','钱包','三折','头层牛皮','其他',32,11,9,2.5,200,0.000248,'东莞丽达皮具','压花可选','',fmtDate(Date.now())],
     ['双拉链方包','钱包','双拉','PU 荔枝纹','PU',26,20,13,7,80,0.00182,'义乌简行箱包','五金电镀哑光','',fmtDate(Date.now())]
   ];
-  var blob = makeXlsx([{ name:'导入模板', rows: rows, widths:[22,10,12,18,10,10,12,12,12,11,10,22,32,30,13] }]);
+  var blob = makeXlsx([{ name:'导入模板', rows: rows, widths:[22,10,12,18,10,10,12,12,12,11,10,22,32,30,12,13] }]);
   downloadBlob(blob, '款式导入模板.xlsx');
   toast('模板已下载，填好后即可导入');
 }
@@ -2080,7 +2132,8 @@ var FIELD_MAP = [
   { k:'volume',  alias:['体积','体积(m³)','体积m³','立方','立方米','材积'] },
   { k:'factory', alias:['厂家名称','厂家','工厂','供应商','生产厂家','厂名'] },
   { k:'note',    alias:['备注','说明','描述','工艺说明'] },
-  { k:'img',     alias:['款式图片','图片','款式图片(图片链接)','图片链接','图片地址'] }
+  { k:'img',     alias:['款式图片','图片','款式图片(图片链接)','图片链接','图片地址'] },
+  { k:'cimg',    alias:['色卡图片','色卡','色卡图','色卡图片(图片链接)'] }
 ];
 function normalizeHead(h){
   return String(h||'').replace(/\s|　/g,'').replace(/[（(].*?[）)]/g,'').toLowerCase();
@@ -2215,7 +2268,7 @@ function doImport(file){
           id: uid(), name: it.name, fabric: it.fabric, price: it.price,
           sizeL: it.sizeL, sizeW: it.sizeW, sizeH: it.sizeH, volume: it.volume, packQty: it.packQty,
           factory: it.factory, note: it.note, tag: it.tag,
-          cat1: it.cat1, cat2: it.cat2, img: '',
+          cat1: it.cat1, cat2: it.cat2, img: '', cimg: '',
           createdAt: now + i, updatedAt: now + i
         });
       });
@@ -2273,7 +2326,8 @@ function collectAll(){
   var db = DB;
   return new Promise(function(resolve){
     if(!db){ resolve({ ver:1, ts:Date.now(), list:list, imgs:{} }); return; }
-    var imgs = {}, keys = list.filter(function(r){ return !!r.img; }).map(function(r){ return r.img; });
+    var imgs = {}, keys = [];
+    list.forEach(function(r){ if(r.img) keys.push(r.img); if(r.cimg) keys.push(r.cimg); });
     var i = 0;
     (function next(){
       if(i >= keys.length){ resolve({ ver:1, ts:Date.now(), list:list, imgs:imgs }); return; }
@@ -2383,7 +2437,7 @@ function doClear(){
     var ids = loadAll().map(function(r){ return r.id; });
     saveAll([]);
     imgCache = {};
-    ids.forEach(function(id){ delImg(id); });
+    ids.forEach(function(id){ delImg(id); delImg(id + '_c'); });
     renderChips(); renderList(); renderStats();
     toast('已清空全部数据');
   });
@@ -2479,6 +2533,26 @@ function bind(){
     setFormImg('');
   };
 
+  // 色卡图片
+  $('upBox2').onclick = function(e){
+    if(e.target.closest('#upDel2')) return;
+    $('f_cimg').click();
+  };
+  $('f_cimg').onchange = function(e){
+    var f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if(!f) return;
+    toast('正在处理图片…');
+    compressImage(f, 1000, 0.78).then(function(res){
+      setFormCimg(res.data);
+      toast('色卡图片已就绪');
+    }).catch(function(){ toast('图片读取失败，请换一张'); });
+  };
+  $('upDel2').onclick = function(e){
+    e.stopPropagation();
+    setFormCimg('');
+  };
+
   // 筛选
   $('filterBtn').onclick = openFilter;
   $('filterMask').onclick = function(){ sheetClose($('filterSheet'), $('filterMask')); };
@@ -2511,6 +2585,7 @@ function bind(){
       var all = loadAll().filter(function(r){ return r.id !== id; });
       saveAll(all);
       delImg(id);
+      delImg(id + '_c');
       sheetClose($('detailSheet'), $('detailMask'));
       renderChips(); renderList(); renderStats();
       toast('已删除');

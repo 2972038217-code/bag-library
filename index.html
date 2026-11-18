@@ -102,7 +102,7 @@ img{display:block;max-width:100%}
   color:#fff;font-size:10px;font-style:normal;line-height:1;padding:3px 7px 4px;
   border-radius:0 8px 0 0;letter-spacing:1px;pointer-events:none}
 .cimg-label{font-size:12.5px;color:#8D96A3;font-weight:500;margin:12px 2px 6px}
-.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb img{width:100%;height:100%;object-fit:contain}
 .thumb span{font-size:11px;color:#B6BEC9}
 .c-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;padding:1px 0}
 .c-top{min-width:0}
@@ -198,7 +198,7 @@ select.inp{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='h
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
   color:var(--text3);font-size:11.5px;flex:0 0 92px;position:relative;overflow:hidden}
 .up-box svg{width:22px;height:22px}
-.up-box img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.up-box img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .up-del{position:absolute;right:4px;top:4px;width:24px;height:24px;border-radius:50%;
   background:rgba(16,24,40,.6);color:#fff;display:flex;align-items:center;justify-content:center;z-index:2}
 .up-del svg{width:13px;height:13px}
@@ -282,9 +282,9 @@ select.inp{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='h
 .dialog .df button.ok{color:var(--brand);font-weight:600}
 
 /* 详情 */
-.detail-img{width:100%;aspect-ratio:1/1;max-height:46vh;background:var(--card2);border-radius:12px;
+.detail-img{width:100%;min-height:200px;max-height:46vh;background:var(--card2);border-radius:12px;
   overflow:hidden;display:flex;align-items:center;justify-content:center;color:#B6BEC9;margin-bottom:4px}
-.detail-img img{width:100%;height:100%;object-fit:cover}
+.detail-img img{display:block;width:auto;height:auto;max-width:100%;max-height:46vh;object-fit:contain}
 .dl{display:flex;padding:11px 0;border-bottom:1px solid var(--line2);font-size:14.5px;gap:12px}
 .dl dt{flex:0 0 74px;color:var(--text3);margin:0;font-size:13.5px}
 .dl dd{flex:1;margin:0;word-break:break-all;text-align:right}
@@ -547,7 +547,7 @@ select.inp{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='h
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
-          <div class="up-tip">点击方块选择图片<br><b>建议正方形</b>，长图会居中裁切<br>压缩后约 30–80KB</div>
+          <div class="up-tip">点击方块选择图片<br><b>任意比例</b>，完整显示不裁切<br>压缩后约 30–80KB</div>
         </div>
         <input type="file" id="f_img" accept="image/*" class="sr">
       </div>
@@ -562,7 +562,7 @@ select.inp{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='h
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
-          <div class="up-tip">点击方块选择色卡图片<br>与款式图片一样自动压缩保存</div>
+          <div class="up-tip">点击方块选择色卡图片<br>任意比例，完整显示不裁切</div>
         </div>
         <input type="file" id="f_cimg" accept="image/*" class="sr">
       </div>
